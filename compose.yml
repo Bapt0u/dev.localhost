@@ -1,0 +1,43 @@
+---
+version: '3'
+
+services:
+  reverse-proxy:
+    container_name: traefik
+    hostname: traefik
+    restart: unless-stopped
+    image: traefik:v3.0
+    command:
+      - --log.level=INFO
+      - --api.insecure=true
+      - --providers.docker
+      - --providers.file.filename=/etc/traefik/ssl.toml
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./conf/ssl.toml:/etc/traefik/ssl.toml
+      - ./certs/:/etc/traefik/ssl/
+    networks:
+      - web
+    labels:
+      - "traefik.enable=true"
+      # Enable Traefik API handler entrypoint on http.
+      - "traefik.http.routers.traefik-http.entrypoints=web"
+      # Define Traefik API handler http host.
+      - "traefik.http.routers.traefik-http.rule=Host(`traefik.dev.localhost`)"
+      # Define http middleware and redirection to https.
+      - "traefik.http.routers.traefik-http.middlewares=traefik-https"
+      - "traefik.http.middlewares.traefik-https.redirectscheme.scheme=https"
+      # Enable Traefik API handler entrypoint on https.
+      - "traefik.http.routers.traefik.entrypoints=websecure"
+      - "traefik.http.services.traefik.loadbalancer.server.port=8080"
+      - "traefik.http.routers.traefik.rule=Host(`traefik.dev.localhost`)"
+      - "traefik.http.routers.traefik.tls=true"
+
+networks:
+  web:
+    external: true
